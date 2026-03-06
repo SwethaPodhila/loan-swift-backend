@@ -6,25 +6,38 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 
 exports.sendOtp = async (req, res) => {
     const { phone } = req.body;
-    if (!phone || phone.length !== 10) return res.status(400).json({ success: false, error: "Invalid phone number" });
+
+    if (!phone || phone.length !== 10) {
+        return res.status(400).json({ success: false, error: "Invalid phone number" });
+    }
 
     try {
-        // 1️⃣ Create new application if not exists
-        let app = await LoanApplication.findOne({ phone });
-        if (!app) {
-            app = new LoanApplication({ phone }); // minimal fields
-            await app.save();
-        }
+        const app = new LoanApplication({ phone, verified: false });
+       // console.log("Creating application:", app);
 
-        // 2️⃣ Send OTP
+        await app.save(); // <-- Make sure Mongoose is connected!
+        //console.log("Application saved:", app._id);
+
         const verification = await client.verify
             .services(process.env.TWILIO_SERVICE_SID)
             .verifications.create({ to: `+91${phone}`, channel: "sms" });
 
-        res.status(200).json({ success: true, message: "OTP sent successfully", data: app });
+       // console.log("Twilio OTP response:", verification);
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent successfully",
+            data: app,
+            otpStatus: verification.status
+        });
+
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, error: "Failed to send OTP" });
+        console.error("Send OTP error:", err);
+        return res.status(500).json({
+            success: false,
+            error: "Failed to send OTP",
+            details: err.message
+        });
     }
 };
 
