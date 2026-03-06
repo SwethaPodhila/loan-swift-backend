@@ -4,32 +4,24 @@ require("dotenv").config();
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// 1️⃣ Create application (without OTP verification)
-exports.createApplication = async (req, res) => {
-    try {
-        const newApp = new LoanApplication(req.body);
-        await newApp.save();
-        res.status(201).json({ success: true, data: newApp });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, error: "Server Error" });
-    }
-};
-
-// 2️⃣ Send OTP
 exports.sendOtp = async (req, res) => {
     const { phone } = req.body;
-
-    if (!phone || phone.length !== 10) {
-        return res.status(400).json({ success: false, error: "Invalid phone number" });
-    }
+    if (!phone || phone.length !== 10) return res.status(400).json({ success: false, error: "Invalid phone number" });
 
     try {
+        // 1️⃣ Create new application if not exists
+        let app = await LoanApplication.findOne({ phone });
+        if (!app) {
+            app = new LoanApplication({ phone }); // minimal fields
+            await app.save();
+        }
+
+        // 2️⃣ Send OTP
         const verification = await client.verify
             .services(process.env.TWILIO_SERVICE_SID)
             .verifications.create({ to: `+91${phone}`, channel: "sms" });
 
-        res.status(200).json({ success: true, message: "OTP sent successfully" });
+        res.status(200).json({ success: true, message: "OTP sent successfully", data: app });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, error: "Failed to send OTP" });
