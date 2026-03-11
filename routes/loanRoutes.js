@@ -13,5 +13,6 @@ router.post("/send-otp", loanController.sendOtp);
 router.post("/verify-otp", loanController.verifyOtp);
 router.put("/:id", loanController.updateApplication); // Update application after OTP verification
 router.get("/users", loanController.getAllUsers);
+router.post("/contact", loanController.sendContactMail);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const LoanApplication = require("../models/LoanApplication");
 const twilio = require("twilio");
 require("dotenv").config();
+const nodemailer = require("nodemailer");
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -126,3 +127,44 @@ exports.getAllUsers = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error during fetching" })
     }
 }
+
+exports.sendContactMail = async (req, res) => {
+    const { name, email, subject, message } = req.body;
+
+    if (!name || !email || !subject || !message) {
+        return res.status(400).json({ error: "All fields are required" });
+    }
+
+    try {
+        // Create transporter
+        const transporter = nodemailer.createTransport({
+            service: "gmail", // or any SMTP
+            auth: {
+                user: process.env.ADMIN_EMAIL,       // admin email
+                pass: process.env.ADMIN_PASSWORD,    // app password
+            },
+        });
+
+        // Email to admin
+        await transporter.sendMail({
+            from: email,
+            to: process.env.ADMIN_EMAIL,
+            subject: `New Contact Message: ${subject}`,
+            text: `Name: ${name}\nEmail: ${email}\nMessage: ${message}`,
+        });
+
+        // Email to user (confirmation)
+        await transporter.sendMail({
+            from: process.env.ADMIN_EMAIL,
+            to: email,
+            subject: `We received your message!`,
+            text: `Hi ${name},\n\nThanks for contacting us. We received your message:\n"${message}"\n\nWe'll get back to you soon!`,
+        });
+
+        res.json({ success: true, message: "Message sent successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Something went wrong" });
+    }
+};
+
