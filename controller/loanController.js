@@ -2,6 +2,7 @@ const LoanApplication = require("../models/LoanApplication");
 const twilio = require("twilio");
 require("dotenv").config();
 const nodemailer = require("nodemailer");
+const CalculateUser = require("../models/CalculateUsers");
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -66,13 +67,18 @@ exports.sendOtp = async (req, res) => {
 
 // 3️⃣ Verify OTP
 exports.verifyOtp = async (req, res) => {
+
     const { phone, otp } = req.body;
 
     if (!phone || !otp) {
-        return res.status(400).json({ success: false, error: "Phone and OTP required" });
+        return res.status(400).json({
+            success: false,
+            error: "Phone and OTP required"
+        });
     }
 
     try {
+
         const verification_check = await client.verify.v2
             .services(process.env.TWILIO_SERVICE_SID)
             .verificationChecks.create({
@@ -81,20 +87,46 @@ exports.verifyOtp = async (req, res) => {
             });
 
         if (verification_check.status === "approved") {
-            // Update application verified field
+
+            // Update LoanApplication
             const app = await LoanApplication.findOneAndUpdate(
                 { phone },
                 { verified: true, otp },
                 { new: true }
             );
 
-            return res.status(200).json({ success: true, message: "OTP verified", data: app });
+            // Update CalculateUser
+            const calcUser = await CalculateUser.findOneAndUpdate(
+                { phone },
+                { verified: true },
+                { new: true }
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: "OTP verified",
+                loanApplication: app,
+                calculateUser: calcUser
+            });
+
         } else {
-            return res.status(400).json({ success: false, error: "Invalid OTP" });
+
+            return res.status(400).json({
+                success: false,
+                error: "Invalid OTP"
+            });
+
         }
+
     } catch (err) {
+
         console.error(err);
-        res.status(500).json({ success: false, error: "OTP verification failed" });
+
+        res.status(500).json({
+            success: false,
+            error: "OTP verification failed"
+        });
+
     }
 };
 
@@ -168,3 +200,90 @@ exports.sendContactMail = async (req, res) => {
     }
 };
 
+exports.checkNumber = async (req, res) => {
+    try {
+
+        const { phone } = req.body;
+
+        if (!phone) {
+            return res.status(400).json({
+                success: false,
+                message: "Mobile number required"
+            });
+        }
+
+        const user = await CalculateUser.findOne({ phone });
+
+        if (user) {
+
+            return res.json({
+                exists: true,
+                message: "User already exists"
+            });
+
+        } else {
+
+            return res.json({
+                exists: false,
+                message: "User not found"
+            });
+
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server Error"
+        });
+    }
+};
+
+exports.sendOtpCalcultor = async (req, res) => {
+
+    const { name, phone } = req.body;
+
+    if (!name || !phone) {
+        return res.status(400).json({ success: false, message: "Name and number required" });
+    }
+
+    try {
+
+        let user = await CalculateUser.findOne({ phone });
+
+        if (!user) {
+
+            user = new CalculateUser({
+                name,
+                phone,
+                verified: false
+            });
+
+            await user.save();
+        }
+
+        const verification = await client.verify.v2
+            .services(process.env.TWILIO_SERVICE_SID)
+            .verifications.create({
+                to: `+91${phone}`,
+                channel: "sms"
+            });
+
+        res.json({
+            success: true,
+            message: "OTP sent successfully",
+            status: verification.status
+        });
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).json({
+            success: false,
+            message: "OTP sending failed"
+        });
+    }
+};
