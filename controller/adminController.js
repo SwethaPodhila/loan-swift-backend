@@ -40,7 +40,7 @@ exports.adminSignup = async (req, res) => {
             { expiresIn: "1d" }
         );
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: "Admin registered successfully",
             token,
             admin: newAdmin
@@ -97,4 +97,122 @@ exports.adminLogin = async (req, res) => {
         });
     }
 
+};
+
+exports.getSubAdmins = async (req, res) => {
+    try {
+
+        if (req.user.role !== "super_admin") {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        const subAdmins = await Admin.find({ role: "sub_admin" }).select("-password");
+
+        res.status(200).json({
+            subAdmins
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+};
+
+exports.updateSubAdmin = async (req, res) => {
+    try {
+
+        if (req.user.role !== "super_admin") {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        const { id } = req.params;
+        const { email, password } = req.body;
+
+        const updateData = { email };
+
+        if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            updateData.password = hashedPassword;
+        }
+
+        const updated = await Admin.findByIdAndUpdate(id, updateData, { new: true });
+
+        res.status(200).json({
+            message: "Updated successfully",
+            updated
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+};
+
+exports.deleteSubAdmin = async (req, res) => {
+    try {
+
+        if (req.user.role !== "super_admin") {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        const { id } = req.params;
+
+        await Admin.findByIdAndDelete(id);
+
+        res.status(200).json({
+            message: "Deleted successfully"
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+};
+
+exports.createSubAdmin = async (req, res) => {
+    try {
+
+        const { email, password } = req.body;
+
+        // 🔐 Only Super Admin allowed
+        if (req.user.role !== "super_admin") {
+            return res.status(403).json({
+                message: "Only super admin can create sub admin"
+            });
+        }
+
+        // ❗ Check existing
+        const existing = await Admin.findOne({ email });
+
+        if (existing) {
+            return res.status(400).json({
+                message: "Admin already exists"
+            });
+        }
+
+        // 🔒 Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // ✅ Create Sub Admin
+        const subAdmin = new Admin({
+            email,
+            password: hashedPassword,
+            role: "sub_admin"
+        });
+
+        await subAdmin.save();
+
+        res.status(201).json({
+            message: "Sub Admin created successfully",
+            subAdmin: {
+                id: subAdmin._id,
+                email: subAdmin.email,
+                role: subAdmin.role
+            }
+        });
+
+    } catch (error) {
+        console.log("Create Sub Admin Error:", error);
+        res.status(500).json({
+            message: "Server error",
+            error
+        });
+    }
 };

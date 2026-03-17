@@ -10,7 +10,7 @@ const adminSchema = new mongoose.Schema({
 
     phone: {
         type: String,
-        required: true
+        required: false
     },
 
     password: {
@@ -20,7 +20,8 @@ const adminSchema = new mongoose.Schema({
 
     role: {
         type: String,
-        default: "admin"
+        enum: ["super_admin", "sub_admin"], // 🔥 important
+        default: "sub_admin"
     }
 
 }, { timestamps: true })
