@@ -149,6 +149,46 @@ exports.updateApplication = async (req, res) => {
     }
 };
 
+// 5️⃣ Delete Application
+exports.deleteApplication = async (req, res) => {
+    const { id } = req.params;
+
+    if (!id) {
+        return res.status(400).json({
+            success: false,
+            error: "Application ID is required"
+        });
+    }
+
+    try {
+        const deletedApp = await LoanApplication.findByIdAndDelete(id);
+
+        if (!deletedApp) {
+            return res.status(404).json({
+                success: false,
+                error: "Application not found"
+            });
+        }
+
+        // optional: CalculateUser ni kuda delete cheyyali ante
+        await CalculateUser.findOneAndDelete({ phone: deletedApp.phone });
+
+        return res.status(200).json({
+            success: true,
+            message: "Application deleted successfully",
+            data: deletedApp
+        });
+
+    } catch (err) {
+        console.error("❌ Delete Error:", err);
+
+        return res.status(500).json({
+            success: false,
+            error: "Failed to delete application"
+        });
+    }
+};
+
 exports.getAllUsers = async (req, res) => {
     try {
         const users = await LoanApplication.find();

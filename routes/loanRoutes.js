@@ -16,5 +16,6 @@ router.get("/users", loanController.getAllUsers);
 router.post("/contact", loanController.sendContactMail);
 router.post("/check-number", loanController.checkNumber);
 router.post("/calculateSendOtp", loanController.sendOtpCalcultor);
+router.delete("/delete/:id", deleteApplication);
 
 module.exports = router;
